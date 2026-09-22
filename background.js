@@ -51,6 +51,7 @@ class ScreenshotTranslator {
     this.isProcessing = false;
     this.MAX_HISTORY = 500; // 历史记录和生词本最大条数
     this.setupMessageListeners();
+    this.setupArxivPdfViewer();
     this.setupInstallListener();
     this.setupContextMenuHandler();
     // 检查是否是首次启动（开发者模式下 onInstalled 不会触发）
@@ -190,6 +191,138 @@ class ScreenshotTranslator {
         contexts: ['selection']
       })
       console.log('Context menu created')
+    })
+  }
+
+  // Edge/Chrome 内置 PDF 阅读器跑在独立插件页里，内容脚本拿不到选区。
+  // 把 arXiv PDF 导航切到扩展自带的 pdf.js 阅读器，文字层才能划词。
+  setupArxivPdfViewer() {
+    this.installArxivPdfRedirectRule()
+    chrome.webNavigation.onCommitted.addListener((details) => {
+      this.onArxivPdfCommitted(details)
+    })
+    chrome.tabs.onRemoved.addListener((tabId) => {
+      this.clearArxivPdfNavState(tabId)
+    })
+  }
+
+  installArxivPdfRedirectRule() {
+    const ruleId = 1001
+    return chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [ruleId],
+      addRules: [{
+        id: ruleId,
+        priority: 1,
+        action: {
+          type: 'redirect',
+          redirect: {
+            regexSubstitution: chrome.runtime.getURL('pdf-viewer.html') + '#\\0'
+          }
+        },
+        condition: {
+          regexFilter: '^https://(?:www\\.|export\\.)?arxiv\\.org/pdf/.+',
+          resourceTypes: ['main_frame'],
+          isUrlFilterCaseSensitive: false
+        }
+      }]
+    }).catch((error) => {
+      console.error('arXiv PDF redirect rule failed:', error)
+    })
+  }
+
+  isArxivPdfUrl(url) {
+    return /^https:\/\/(?:www\.|export\.)?arxiv\.org\/pdf\/.+/i.test(url || '')
+  }
+
+  isArxivNativeBypass(url) {
+    try {
+      return new URL(url).searchParams.get('qt_native') === '1'
+    } catch {
+      return false
+    }
+  }
+
+  async getArxivPdfNavState(tabId) {
+    const data = await chrome.storage.session.get('arxivPdfNav')
+    return data.arxivPdfNav?.[String(tabId)] || ''
+  }
+
+  async setArxivPdfNavState(tabId, value) {
+    const key = 'arxivPdfNav'
+    const data = await chrome.storage.session.get(key)
+    const map = data[key] || {}
+    map[String(tabId)] = value
+    await chrome.storage.session.set({ [key]: map })
+  }
+
+  async clearArxivPdfNavState(tabId) {
+    const key = 'arxivPdfNav'
+    const data = await chrome.storage.session.get(key)
+    const map = data[key] || {}
+    if (!map[String(tabId)]) return
+    delete map[String(tabId)]
+    await chrome.storage.session.set({ [key]: map })
+  }
+
+  arxivPdfViewerUrl(pdfUrl) {
+    const clean = String(pdfUrl || '').split('#')[0]
+    return chrome.runtime.getURL('pdf-viewer.html') + '#' + encodeURIComponent(clean)
+  }
+
+  async openArxivPdfViewer(tabId, pdfUrl) {
+    await this.setArxivPdfNavState(tabId, 'viewer')
+    await chrome.tabs.update(tabId, { url: this.arxivPdfViewerUrl(pdfUrl) })
+  }
+
+  async onArxivPdfCommitted(details) {
+    try {
+      if (details.frameId !== 0) return
+      const committedUrl = details.url || ''
+      if (committedUrl.startsWith(chrome.runtime.getURL('pdf-viewer.html'))) return
+      let url = committedUrl
+      if (!this.isArxivPdfUrl(url)) {
+        const tab = await chrome.tabs.get(details.tabId)
+        url = this.isArxivPdfUrl(tab.url) ? tab.url : ''
+      }
+      if (!url || this.isArxivNativeBypass(url)) return
+
+      const back = (details.transitionQualifiers || []).includes('forward_back')
+      const state = await this.getArxivPdfNavState(details.tabId)
+      if (back && state === 'viewer') {
+        await this.setArxivPdfNavState(details.tabId, 'backing')
+        chrome.tabs.goBack(details.tabId)
+        const stuckOn = url
+        setTimeout(async () => {
+          try {
+            const tab = await chrome.tabs.get(details.tabId)
+            if (tab.url === stuckOn) await this.openArxivPdfViewer(details.tabId, stuckOn)
+          } catch {
+            // 标签已关闭
+          }
+        }, 400)
+        return
+      }
+
+      await this.openArxivPdfViewer(details.tabId, url)
+    } catch (error) {
+      console.error('arXiv PDF redirect failed:', error)
+    }
+  }
+
+  openArxivPdfNatively(url, tabId, sendResponse) {
+    if (!tabId || !this.isArxivPdfUrl(url)) {
+      sendResponse({ success: false, error: '无效的 arXiv PDF 链接' })
+      return
+    }
+    const nativeUrl = url + (url.includes('?') ? '&' : '?') + 'qt_native=1'
+    this.setArxivPdfNavState(tabId, 'native').finally(() => {
+      chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [1001] }).finally(() => {
+        chrome.tabs.update(tabId, { url: nativeUrl }, () => {
+          const err = chrome.runtime.lastError
+          sendResponse({ success: !err, error: err?.message })
+          setTimeout(() => this.installArxivPdfRedirectRule(), 1200)
+        })
+      })
     })
   }
 
@@ -565,6 +698,18 @@ class ScreenshotTranslator {
         case 'ping':
           console.log('Ping received');
           sendResponse({ success: true, message: 'pong', timestamp: Date.now() });
+          break;
+        case 'openArxivPdfNative':
+          this.openArxivPdfNatively(request.url, sender.tab?.id, sendResponse);
+          break;
+        case 'arxivPdfViewerReady':
+          if (sender.tab?.id) {
+            this.setArxivPdfNavState(sender.tab.id, 'viewer').finally(() => {
+              sendResponse({ success: true });
+            });
+          } else {
+            sendResponse({ success: false });
+          }
           break;
         case 'startCapture':
           console.log('Starting capture...');
