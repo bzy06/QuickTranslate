@@ -54,6 +54,8 @@
 ## 📄 arXiv 论文划词
 
 在 Edge 或 Chrome 中打开 `https://arxiv.org/pdf/...` 时，论文会用内置阅读器打开。用鼠标选中一段英文，点击「翻译」即可。浏览器自带的 PDF 阅读器读不到选中的文字，所以 arXiv 的 PDF 会改走这个阅读器。扫描版论文没有文字层，无法划词。
+<img width="1912" height="914" alt="image" src="https://github.com/user-attachments/assets/90d45b58-07d3-4173-bafc-b045fab8b4bc" />
+
 
 ## 🧩 模块系统（核心架构）
 
