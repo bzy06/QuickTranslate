@@ -46,11 +46,24 @@ export default [
     }
   },
   {
+    files: ['pdf-viewer.js'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: {
+        ResizeObserver: 'readonly',
+        requestAnimationFrame: 'readonly',
+        Range: 'readonly',
+        Node: 'readonly'
+      }
+    }
+  },
+  {
     ignores: [
       'node_modules/**',
       '*.min.js',
       'releases/**',
-      'packages/create-qt-module/templates/**'
+      'packages/create-qt-module/templates/**',
+      'vendor/**'
     ]
   }
 ]

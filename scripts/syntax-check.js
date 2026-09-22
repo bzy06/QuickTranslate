@@ -12,7 +12,8 @@ const SKIP = new Set([
   '.git',
   'templates',
   'QuickTranslate-assets',
-  'quicktranslate-promotion'
+  'quicktranslate-promotion',
+  'vendor'
 ])
 
 function walk(dir, out = []) {

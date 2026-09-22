@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>arXiv PDF - QuickTranslate</title>
+  <link rel="stylesheet" href="pdf-viewer.css">
+  <link rel="stylesheet" href="quick-panel.css">
+</head>
+<body>
+  <header class="pdf-toolbar">
+    <div class="pdf-title" id="doc-title">正在打开 arXiv PDF…</div>
+    <div class="pdf-tools">
+      <button type="button" id="zoom-out" title="缩小">−</button>
+      <button type="button" id="zoom-in" title="放大">+</button>
+      <button type="button" id="fit-width">适合宽度</button>
+      <span id="page-label"></span>
+      <button type="button" id="open-native">用浏览器打开</button>
+    </div>
+  </header>
+  <div id="status" class="pdf-status">正在下载 PDF…</div>
+  <main id="viewer"></main>
+  <script src="quick-panel.js"></script>
+  <script type="module" src="pdf-viewer.js"></script>
+</body>
+</html>
