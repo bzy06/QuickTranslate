@@ -43,12 +43,19 @@
 | 🖱️ | Hover Translate | mode | Hold Alt + hover, no selection needed |
 | 📝 | Select-to-Translate | mode | Auto-translate on selection, result popup |
 | 📷 | Screenshot Translate | built-in | Capture area → OCR → translate |
+| 📄 | arXiv PDF Selection | built-in | Open an arXiv PDF, select English text, and translate |
 | 🌐 | Multi-Engine | translator | Compare Google / LLM results side by side |
 | 🧹 | Text Sanitizer | processor | Auto-clean whitespace, line breaks, HTML entities |
 | 🛡️ | Code Protector | processor | Protect code blocks from translation |
 | 💾 | Translation Cache | service | LRU cache, faster repeated translations |
 | 📚 | History & Word Book | service | Auto-save history, save words |
 | 🌙 | Dark Mode | style | Follows system theme automatically |
+
+## 📄 arXiv Paper Selection Translate
+
+When you open `https://arxiv.org/pdf/...` in Edge or Chrome, the paper opens in the built-in viewer. Select an English passage and click Translate. The browser’s built-in PDF viewer does not expose selected text, so arXiv PDFs are routed to this viewer. Scanned papers without a text layer cannot be selected.
+
+<img width="1912" height="914" alt="arXiv PDF selection translate" src="https://github.com/user-attachments/assets/90d45b58-07d3-4173-bafc-b045fab8b4bc" />
 
 ## 🧩 Module System (Core Architecture)
 
@@ -90,7 +97,7 @@ Generate a module template in 30 seconds. Import the .qt-module file directly.
 ### Or load unpacked
 
 ```
-git clone https://github.com/kany2000/QuickTranslate.git
+git clone https://github.com/bzy06/QuickTranslate.git
 ```
 
 1. Open chrome://extensions
