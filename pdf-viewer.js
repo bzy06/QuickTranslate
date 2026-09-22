@@ -7,7 +7,8 @@ import {
 GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.min.mjs')
 
 const PDF_TO_CSS = 96 / 72
-const ARXIV_PDF = /^https:\/\/(?:www\.|export\.)?arxiv\.org\/pdf\/.+/i
+const PDF_FILE = /^https?:\/\/[^?#]*\.pdf(?:\?[^#]*)?(?:#.*)?$/i
+const ARXIV_PDF = /^https:\/\/(?:www\.|export\.)?arxiv\.org\/pdf\/[^#]+(?:#.*)?$/i
 
 const state = {
   pdf: null,
@@ -39,16 +40,35 @@ function extensionDir(path) {
   return url.endsWith('/') ? url : url + '/'
 }
 
+function isPdfUrl(url) {
+  return PDF_FILE.test(url || '') || ARXIV_PDF.test(url || '')
+}
+
 function readPdfUrl() {
   const raw = location.hash.startsWith('#') ? location.hash.slice(1) : ''
   if (!raw) return ''
+  let candidate = raw
   try {
-    const decoded = decodeURIComponent(raw)
-    if (ARXIV_PDF.test(decoded)) return decoded
+    candidate = decodeURIComponent(raw)
   } catch {
     // 哈希里没有需要再解码的内容
   }
-  return ARXIV_PDF.test(raw) ? raw : ''
+  const clean = candidate.split('#')[0]
+  return isPdfUrl(clean) ? clean : ''
+}
+
+function labelFromPdfUrl(pdfUrl) {
+  try {
+    const url = new URL(pdfUrl)
+    const arxiv = url.pathname.match(/\/pdf\/([^/]+)$/i)
+    if (arxiv && /(^|\.)arxiv\.org$/i.test(url.hostname)) {
+      return decodeURIComponent(arxiv[1].replace(/\.pdf$/i, ''))
+    }
+    const base = url.pathname.split('/').filter(Boolean).pop()
+    return base ? decodeURIComponent(base) : url.hostname
+  } catch {
+    return 'PDF'
+  }
 }
 
 function setStatus(message, isError) {
@@ -351,9 +371,9 @@ function resizeCanvas(holder, viewport) {
 
 async function openPdf(pdfUrl) {
   state.pdfUrl = pdfUrl
-  const arxivId = pdfUrl.split('/pdf/')[1].split('?')[0].replace(/\.pdf$/i, '')
-  titleEl.textContent = arxivId
-  document.title = arxivId + ' - QuickTranslate'
+  const label = labelFromPdfUrl(pdfUrl)
+  titleEl.textContent = label
+  document.title = label + ' - QuickTranslate'
   setStatus('正在打开第 1 页…')
 
   const pdf = await getDocument({
@@ -410,7 +430,7 @@ document.getElementById('fit-width').addEventListener('click', () => {
 
 document.getElementById('open-native').addEventListener('click', () => {
   if (!state.pdfUrl) return
-  chrome.runtime.sendMessage({ action: 'openArxivPdfNative', url: state.pdfUrl })
+  chrome.runtime.sendMessage({ action: 'openPdfNative', url: state.pdfUrl })
 })
 
 let scrollScheduled = false
@@ -435,11 +455,11 @@ new ResizeObserver(() => {
   resizeTimer = setTimeout(relayout, 200)
 }).observe(viewer)
 
-chrome.runtime.sendMessage({ action: 'arxivPdfViewerReady' })
+chrome.runtime.sendMessage({ action: 'pdfViewerReady' })
 
 const pdfUrl = readPdfUrl()
 if (!pdfUrl) {
-  setStatus('没有找到 arXiv PDF 地址。请从 arxiv.org/pdf/ 打开论文。', true)
+  setStatus('没有找到 PDF 地址。请打开以 .pdf 结尾的链接，或 arXiv 论文。', true)
 } else {
   openPdf(pdfUrl).catch((error) => {
     console.error(error)

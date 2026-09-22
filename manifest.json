@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "QuickTranslate - 快译",
-  "version": "3.3.4",
+  "version": "3.3.5",
   "description": "QuickTranslate 快译 - 選中文字即時翻譯，支持 Google、Microsoft、GLM、LLM。快捷面板、截圖、懸浮翻譯，識別準確率 98%+。",
   "author": "QuickTranslate Team",
   "permissions": [
@@ -15,9 +15,7 @@
     "declarativeNetRequest"
   ],
   "host_permissions": [
-    "https://arxiv.org/*",
-    "https://www.arxiv.org/*",
-    "https://export.arxiv.org/*",
+    "<all_urls>",
     "https://translate.googleapis.com/*",
     "https://clients5.google.com/*",
     "https://api.mymemory.translated.net/*",

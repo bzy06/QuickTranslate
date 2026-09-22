@@ -51,7 +51,7 @@ class ScreenshotTranslator {
     this.isProcessing = false;
     this.MAX_HISTORY = 500; // 历史记录和生词本最大条数
     this.setupMessageListeners();
-    this.setupArxivPdfViewer();
+    this.setupPdfViewer();
     this.setupInstallListener();
     this.setupContextMenuHandler();
     // 检查是否是首次启动（开发者模式下 onInstalled 不会触发）
@@ -195,46 +195,63 @@ class ScreenshotTranslator {
   }
 
   // Edge/Chrome 内置 PDF 阅读器跑在独立插件页里，内容脚本拿不到选区。
-  // 把 arXiv PDF 导航切到扩展自带的 pdf.js 阅读器，文字层才能划词。
-  setupArxivPdfViewer() {
-    this.installArxivPdfRedirectRule()
+  // 路径以 .pdf 结尾，或 arXiv /pdf/ 的导航，改走扩展自带的 pdf.js 阅读器。
+  setupPdfViewer() {
+    this.installPdfRedirectRules()
     chrome.webNavigation.onCommitted.addListener((details) => {
-      this.onArxivPdfCommitted(details)
+      this.onPdfCommitted(details)
     })
     chrome.tabs.onRemoved.addListener((tabId) => {
-      this.clearArxivPdfNavState(tabId)
+      this.clearPdfNavState(tabId)
     })
   }
 
-  installArxivPdfRedirectRule() {
-    const ruleId = 1001
+  pdfRuleIds() {
+    return [1001, 1002]
+  }
+
+  installPdfRedirectRules() {
+    const viewer = chrome.runtime.getURL('pdf-viewer.html') + '#\\0'
+    const redirect = {
+      type: 'redirect',
+      redirect: { regexSubstitution: viewer }
+    }
     return chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [ruleId],
-      addRules: [{
-        id: ruleId,
-        priority: 1,
-        action: {
-          type: 'redirect',
-          redirect: {
-            regexSubstitution: chrome.runtime.getURL('pdf-viewer.html') + '#\\0'
+      removeRuleIds: this.pdfRuleIds(),
+      addRules: [
+        {
+          id: 1001,
+          priority: 1,
+          action: redirect,
+          condition: {
+            regexFilter: '^https?://[^?#]*\\.pdf(?:\\?[^#]*)?(?:#.*)?$',
+            resourceTypes: ['main_frame'],
+            isUrlFilterCaseSensitive: false
           }
         },
-        condition: {
-          regexFilter: '^https://(?:www\\.|export\\.)?arxiv\\.org/pdf/.+',
-          resourceTypes: ['main_frame'],
-          isUrlFilterCaseSensitive: false
+        {
+          id: 1002,
+          priority: 1,
+          action: redirect,
+          condition: {
+            regexFilter: '^https://(?:www\\.|export\\.)?arxiv\\.org/pdf/[^#]+(?:#.*)?$',
+            resourceTypes: ['main_frame'],
+            isUrlFilterCaseSensitive: false
+          }
         }
-      }]
+      ]
     }).catch((error) => {
-      console.error('arXiv PDF redirect rule failed:', error)
+      console.error('PDF redirect rules failed:', error)
     })
   }
 
-  isArxivPdfUrl(url) {
-    return /^https:\/\/(?:www\.|export\.)?arxiv\.org\/pdf\/.+/i.test(url || '')
+  isPdfUrl(url) {
+    const value = url || ''
+    return /^https?:\/\/[^?#]*\.pdf(?:\?[^#]*)?(?:#.*)?$/i.test(value) ||
+      /^https:\/\/(?:www\.|export\.)?arxiv\.org\/pdf\/[^#]+(?:#.*)?$/i.test(value)
   }
 
-  isArxivNativeBypass(url) {
+  isPdfNativeBypass(url) {
     try {
       return new URL(url).searchParams.get('qt_native') === '1'
     } catch {
@@ -242,21 +259,21 @@ class ScreenshotTranslator {
     }
   }
 
-  async getArxivPdfNavState(tabId) {
-    const data = await chrome.storage.session.get('arxivPdfNav')
-    return data.arxivPdfNav?.[String(tabId)] || ''
+  async getPdfNavState(tabId) {
+    const data = await chrome.storage.session.get('pdfNav')
+    return data.pdfNav?.[String(tabId)] || ''
   }
 
-  async setArxivPdfNavState(tabId, value) {
-    const key = 'arxivPdfNav'
+  async setPdfNavState(tabId, value) {
+    const key = 'pdfNav'
     const data = await chrome.storage.session.get(key)
     const map = data[key] || {}
     map[String(tabId)] = value
     await chrome.storage.session.set({ [key]: map })
   }
 
-  async clearArxivPdfNavState(tabId) {
-    const key = 'arxivPdfNav'
+  async clearPdfNavState(tabId) {
+    const key = 'pdfNav'
     const data = await chrome.storage.session.get(key)
     const map = data[key] || {}
     if (!map[String(tabId)]) return
@@ -264,38 +281,38 @@ class ScreenshotTranslator {
     await chrome.storage.session.set({ [key]: map })
   }
 
-  arxivPdfViewerUrl(pdfUrl) {
+  pdfViewerUrl(pdfUrl) {
     const clean = String(pdfUrl || '').split('#')[0]
     return chrome.runtime.getURL('pdf-viewer.html') + '#' + encodeURIComponent(clean)
   }
 
-  async openArxivPdfViewer(tabId, pdfUrl) {
-    await this.setArxivPdfNavState(tabId, 'viewer')
-    await chrome.tabs.update(tabId, { url: this.arxivPdfViewerUrl(pdfUrl) })
+  async openPdfViewer(tabId, pdfUrl) {
+    await this.setPdfNavState(tabId, 'viewer')
+    await chrome.tabs.update(tabId, { url: this.pdfViewerUrl(pdfUrl) })
   }
 
-  async onArxivPdfCommitted(details) {
+  async onPdfCommitted(details) {
     try {
       if (details.frameId !== 0) return
       const committedUrl = details.url || ''
       if (committedUrl.startsWith(chrome.runtime.getURL('pdf-viewer.html'))) return
       let url = committedUrl
-      if (!this.isArxivPdfUrl(url)) {
+      if (!this.isPdfUrl(url)) {
         const tab = await chrome.tabs.get(details.tabId)
-        url = this.isArxivPdfUrl(tab.url) ? tab.url : ''
+        url = this.isPdfUrl(tab.url) ? tab.url : ''
       }
-      if (!url || this.isArxivNativeBypass(url)) return
+      if (!url || this.isPdfNativeBypass(url)) return
 
       const back = (details.transitionQualifiers || []).includes('forward_back')
-      const state = await this.getArxivPdfNavState(details.tabId)
+      const state = await this.getPdfNavState(details.tabId)
       if (back && state === 'viewer') {
-        await this.setArxivPdfNavState(details.tabId, 'backing')
+        await this.setPdfNavState(details.tabId, 'backing')
         chrome.tabs.goBack(details.tabId)
         const stuckOn = url
         setTimeout(async () => {
           try {
             const tab = await chrome.tabs.get(details.tabId)
-            if (tab.url === stuckOn) await this.openArxivPdfViewer(details.tabId, stuckOn)
+            if (tab.url === stuckOn) await this.openPdfViewer(details.tabId, stuckOn)
           } catch {
             // 标签已关闭
           }
@@ -303,24 +320,24 @@ class ScreenshotTranslator {
         return
       }
 
-      await this.openArxivPdfViewer(details.tabId, url)
+      await this.openPdfViewer(details.tabId, url)
     } catch (error) {
-      console.error('arXiv PDF redirect failed:', error)
+      console.error('PDF redirect failed:', error)
     }
   }
 
-  openArxivPdfNatively(url, tabId, sendResponse) {
-    if (!tabId || !this.isArxivPdfUrl(url)) {
-      sendResponse({ success: false, error: '无效的 arXiv PDF 链接' })
+  openPdfNatively(url, tabId, sendResponse) {
+    if (!tabId || !this.isPdfUrl(url)) {
+      sendResponse({ success: false, error: '无效的 PDF 链接' })
       return
     }
     const nativeUrl = url + (url.includes('?') ? '&' : '?') + 'qt_native=1'
-    this.setArxivPdfNavState(tabId, 'native').finally(() => {
-      chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [1001] }).finally(() => {
+    this.setPdfNavState(tabId, 'native').finally(() => {
+      chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: this.pdfRuleIds() }).finally(() => {
         chrome.tabs.update(tabId, { url: nativeUrl }, () => {
           const err = chrome.runtime.lastError
           sendResponse({ success: !err, error: err?.message })
-          setTimeout(() => this.installArxivPdfRedirectRule(), 1200)
+          setTimeout(() => this.installPdfRedirectRules(), 1200)
         })
       })
     })
@@ -699,12 +716,12 @@ class ScreenshotTranslator {
           console.log('Ping received');
           sendResponse({ success: true, message: 'pong', timestamp: Date.now() });
           break;
-        case 'openArxivPdfNative':
-          this.openArxivPdfNatively(request.url, sender.tab?.id, sendResponse);
+        case 'openPdfNative':
+          this.openPdfNatively(request.url, sender.tab?.id, sendResponse);
           break;
-        case 'arxivPdfViewerReady':
+        case 'pdfViewerReady':
           if (sender.tab?.id) {
-            this.setArxivPdfNavState(sender.tab.id, 'viewer').finally(() => {
+            this.setPdfNavState(sender.tab.id, 'viewer').finally(() => {
               sendResponse({ success: true });
             });
           } else {
