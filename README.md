@@ -43,12 +43,17 @@
 | 🖱️ | **悬浮翻译** | mode | 按住 Alt 悬停文字，无需选中 |
 | 📝 | **选词即译** | mode | 选中文字后自动翻译，浮窗展示 |
 | 📷 | **截图翻译** | 内置 | 截取屏幕区域 → OCR → 翻译 |
+| 📄 | **arXiv PDF 划词** | 内置 | 打开 arXiv 论文 PDF，选中英文段落即可翻译 |
 | 🌐 | **多引擎对比** | translator | 同时展示 Google / LLM 等翻译结果 |
 | 🧹 | **文本净化** | processor | 自动清理多余空格、换行、HTML 实体 |
 | 🛡️ | **代码保护** | processor | 保护代码块不被翻译引擎破坏 |
 | 💾 | **翻译缓存** | service | LRU 缓存，相同文字加速 |
 | 📚 | **历史与生词本** | service | 自动保存翻译历史，收藏生词 |
 | 🌙 | **暗色模式** | style | 跟随系统自动切换，全面板支持 |
+
+## 📄 arXiv 论文划词
+
+在 Edge 或 Chrome 中打开 `https://arxiv.org/pdf/...` 时，论文会用内置阅读器打开。用鼠标选中一段英文，点击「翻译」即可。浏览器自带的 PDF 阅读器读不到选中的文字，所以 arXiv 的 PDF 会改走这个阅读器。扫描版论文没有文字层，无法划词。
 
 ## 🧩 模块系统（核心架构）
 
@@ -90,7 +95,7 @@ node packages/create-qt-module/index.js
 ### 或开发者模式加载
 
 ```bash
-git clone https://github.com/kany2000/QuickTranslate.git
+git clone https://github.com/bzy06/QuickTranslate.git
 ```
 
 1. 打开 `chrome://extensions`
