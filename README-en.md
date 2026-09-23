@@ -43,7 +43,7 @@
 | 🖱️ | Hover Translate | mode | Hold Alt + hover, no selection needed |
 | 📝 | Select-to-Translate | mode | Auto-translate on selection, result popup |
 | 📷 | Screenshot Translate | built-in | Capture area → OCR → translate |
-| 📄 | arXiv PDF Selection | built-in | Open an arXiv PDF, select English text, and translate |
+| 📄 | Online PDF Selection | built-in | Open a `.pdf` link or an arXiv paper, select text, and translate |
 | 🌐 | Multi-Engine | translator | Compare Google / LLM results side by side |
 | 🧹 | Text Sanitizer | processor | Auto-clean whitespace, line breaks, HTML entities |
 | 🛡️ | Code Protector | processor | Protect code blocks from translation |
@@ -51,9 +51,9 @@
 | 📚 | History & Word Book | service | Auto-save history, save words |
 | 🌙 | Dark Mode | style | Follows system theme automatically |
 
-## 📄 arXiv Paper Selection Translate
+## 📄 Online PDF Selection Translate
 
-When you open `https://arxiv.org/pdf/...` in Edge or Chrome, the paper opens in the built-in viewer. Select an English passage and click Translate. The browser’s built-in PDF viewer does not expose selected text, so arXiv PDFs are routed to this viewer. Scanned papers without a text layer cannot be selected.
+When you open a link ending in `.pdf`, or `https://arxiv.org/pdf/...`, in Edge or Chrome, the file opens in the built-in viewer. Select a passage and click Translate. The browser’s built-in PDF viewer does not expose selected text, so these PDFs are routed to this viewer. Links that do not look like a PDF, and files that require a login, are not opened automatically in this version. Scanned papers without a text layer cannot be selected.
 
 <img width="1912" height="914" alt="arXiv PDF selection translate" src="https://github.com/user-attachments/assets/90d45b58-07d3-4173-bafc-b045fab8b4bc" />
 
